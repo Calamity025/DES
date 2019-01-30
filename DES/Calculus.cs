@@ -1,9 +1,10 @@
 using System;
 using System.Collections;
-using System.Windows.Forms;
+using System.Text;
 
 namespace DES {
 	public static class Calculus {
+		private static readonly Encoding cp866 = Encoding.GetEncoding(866);
 		private static int[] P10 = {3, 5, 2, 7, 4, 10, 1, 9, 8, 6};
 		private static int[] P8 = {6, 3, 7, 4, 8, 5, 10, 9};
 		private static int[] IP = {2, 6, 3, 1, 4, 8, 5, 7};
@@ -23,6 +24,11 @@ namespace DES {
 			{2, 1, 0, 3}
 		};
 
+		private static int GetCharPosition(char ch) {
+			byte[] pos = cp866.GetBytes(Convert.ToString(ch));
+			return pos[0];
+		}
+		
 		private static BitArray Reverse(BitArray array)
 		{
 			int length = array.Length;
@@ -37,13 +43,22 @@ namespace DES {
 			return array;
 		}
 		private static BitArray InitInput(int value) {
-			BitArray bitArray = NumberToBitArray(value);
+			BitArray bitArray = NumberToBitArray(value, 8);
 			bitArray = Shaffle(bitArray, IP);
 			return bitArray;
 		}
-		private static BitArray NumberToBitArray(int number) {
-			byte[] numberInBytes = {(byte)number};
+
+		private static BitArray CutBitArray(BitArray array, int numberOfBits) {
+			BitArray tempArray = new BitArray(numberOfBits);
+			for (int i = 0; i < numberOfBits; i++) {
+				tempArray.Set(i,array[i]);
+			}
+			return tempArray;
+		}
+		private static BitArray NumberToBitArray(int number, int numberOfBits) {
+			int[] numberInBytes = {number};
 			BitArray numberInBits = new BitArray(numberInBytes);
+			numberInBits = CutBitArray(numberInBits, numberOfBits);
 			numberInBits = Reverse(numberInBits);
 			return numberInBits;
 		}
@@ -77,20 +92,8 @@ namespace DES {
 		}
 
 		private static BitArray InitKey(int key) {
-			BitArray keyInBits = NumberToBitArray(key);
-			bool isLeftPair = keyInBits[0] ^ keyInBits[1] ^ keyInBits[2] ^ keyInBits[3];
-			bool isRightPair = keyInBits[4] ^ keyInBits[5] ^ keyInBits[6] ^ keyInBits[7];
-			BitArray enlongedKey = new BitArray(10);
-			for (int i = 0; i < enlongedKey.Length; i++) {
-				if (i == 0) {
-					enlongedKey.Set(i, isLeftPair);
-				} else if (i == enlongedKey.Length - 1) {
-					enlongedKey.Set(i, isRightPair);
-				} else {
-					enlongedKey.Set(i, keyInBits[i-1]);	
-				}
-			}
-			return Shaffle(enlongedKey, P10);
+			BitArray keyInBits = NumberToBitArray(key, 10);
+			return Shaffle(keyInBits, P10);
 		}
 		private static BitArray KeyGen(BitArray keyArray, int shift) {
 			BitArray[] temp = SliceBitArray(keyArray,5);
@@ -130,18 +133,16 @@ namespace DES {
 			int[] comparison = new int[2];
 			first.CopyTo(comparison, 0);
 			second.CopyTo(comparison, 1);
-			byte[] temp = {(byte) sBlock[comparison[0], comparison[1]]};
-			BitArray extOutput = new BitArray(temp);
-			BitArray output = new BitArray(2);
-			for (int i = 0; i < output.Length; i++) {
-				output.Set(i, extOutput[i]);
-			}
+			int[] temp = {sBlock[comparison[0], comparison[1]]};
+			BitArray output = new BitArray(temp);
+			output = CutBitArray(output, 2);
 			output = Reverse(output);
 			return output;
 		}
 		
 		//методы с порядком выполнения операций и проверок сразу после нажатия кнопки
-		public static int Encrypt(int value, int key) {
+		public static char Encrypt(char input, int key) {
+			int value = GetCharPosition(input);
 			BitArray initKey = InitKey(key);
 			BitArray[] initInput = SliceBitArray(InitInput(value), 4);
 			BitArray left = initInput[0];
@@ -171,7 +172,8 @@ namespace DES {
 			}
 			int[] final = new int[1];
 			result.CopyTo(final, 0);
-			return final[0];
+			char[] ch = cp866.GetChars(new [] {(byte)final[0]});
+			return ch[0];
 		}
 		public static string Decrypt(string text, string key) {
 			return null;
