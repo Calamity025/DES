@@ -57,14 +57,20 @@ namespace DES {
             Controls.Add(decryptButton);
         }
         //ивенты нажатий на кнопки
-        void DecryptClick(object sender, EventArgs e) {
-        }
         void EncryptClick(object sender, EventArgs e) {
             string temp = "";
             for (int i = 0; i < Input.TextLength; i++) {
                 temp += Convert.ToString(Calculus.Encrypt(Input.Text[i], (int) Key.Value));
             }
             Output.Text = temp;
+        }
+        
+        void DecryptClick(object sender, EventArgs e) {
+            string temp = "";
+            for (int i = 0; i < Output.TextLength; i++) {
+                temp += Convert.ToString(Calculus.Decrypt(Output.Text[i], (int) Key.Value));
+            }
+            Input.Text = temp;
         }
     }
 }
