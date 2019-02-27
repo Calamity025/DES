@@ -32,7 +32,7 @@ namespace DES {
 			return pos[0];
 		}
 		//функция оборота битового массива, потому что по дефолту младшие биты в нашем понимании тут - старшие и vise versa
-		private static BitArray Reverse(BitArray array)
+		private static void Reverse(ref BitArray array)
 		{
 			int length = array.Length;
 			int mid = (length / 2);
@@ -42,16 +42,15 @@ namespace DES {
 				array[i] = array[length - i - 1];
 				array[length - i - 1] = bit;
 			}
-
-			return array;
 		}
-		//инициализация символа
+		//инициализация символа (превращение из числа в битовый массив + блок перестановки)
 		private static BitArray InitInput(int value, int[] pBlock) {
 			BitArray bitArray = NumberToBitArray(value, 8);
-			bitArray = Shaffle(bitArray, pBlock);
+			Shaffle(ref bitArray, pBlock);
 			return bitArray;
 		}
-		//функция "резания" массива. По дефолту битовый массив для инта создает 32 бита, но нам так много не надо, а что бы нормально обрезать его до нужных нам 8ми битов и используем эту функцию
+		//функция "резания" массива. По дефолту битовый массив для инта создает 32 бита, но нам так много не надо,
+		//а что бы нормально обрезать его до нужных нам 8ми битов и используем эту функцию
 		//Если юзать превращение в массив битов через byte то у нас будет 8 бит, а для ключа нужно уже 10
 		private static BitArray CutBitArray(BitArray array, int numberOfBits) {
 			BitArray tempArray = new BitArray(numberOfBits);
@@ -62,16 +61,15 @@ namespace DES {
 		}
 		//превращаем число в битовый массив с помощью встроенной функции (самого понимания и применения битового массива)
 		private static BitArray NumberToBitArray(int number, int numberOfBits) {
-			int[] numberInBytes = {number};
-			BitArray numberInBits = new BitArray(numberInBytes);
+			BitArray numberInBits = new BitArray(new [] {number});
 			numberInBits = CutBitArray(numberInBits, numberOfBits);
-			numberInBits = Reverse(numberInBits);
+			Reverse(ref numberInBits);
 			return numberInBits;
 		}
 		//делим один массив на 2 заданной длины
-		private static (BitArray leftpart, BitArray rightpart) SliceBitArray(BitArray numberInBits, int length) {
-			BitArray left = new BitArray(length, false);
-			BitArray right = new BitArray(length, false);
+		private static void SliceBitArray(BitArray numberInBits, int length, out BitArray left, out BitArray right) {
+			left = new BitArray(length, false);
+			right = new BitArray(length, false);
 			for (int i = 0; i < numberInBits.Length; i++) {
 				if (i < length) {
 					left.Set(i, numberInBits[i]);
@@ -80,41 +78,42 @@ namespace DES {
 					right.Set(i-length, numberInBits[i]);
 				}
 			}
-			return (left, right);
 		}
 		//объединяем массивы
 		private static BitArray UniteArrays(BitArray left, BitArray right) {
-			BitArray united = new BitArray(left.Length*2);
-			for (int i = 0; i < united.Length; i++) {
+			BitArray unitedArray = new BitArray(left.Length*2);
+			for (int i = 0; i < unitedArray.Length; i++) {
 				if (i < left.Length) {
-					united.Set(i, left[i]);
+					unitedArray.Set(i, left[i]);
 				}
 				else {
-					united.Set(i, right[i - left.Length]);
+					unitedArray.Set(i, right[i - left.Length]);
 				}
 			}
-			return united;
+
+			return unitedArray;
 		}
 		//инициилизируем сразу оба раундовых ключа
-		//лень сокращать/делать цикл/пилить рекурсию
 		private static void InitKeys(int key) {
 			BitArray keyInBits = NumberToBitArray(key, 10);
-			keyInBits = Shaffle(keyInBits, P10);
-			var temp = SliceBitArray(keyInBits,5);
-			BitArray left = temp.leftpart;
-			BitArray right = temp.rightpart;
-			left = Shift(left, 1);
-			right = Shift(right, 1);
-			keyInBits = UniteArrays(left, right);
-			keyInBits = Shaffle(keyInBits, P8);
-			roundKeys[0] = keyInBits;
-			left = Shift(left, 2);
-			right = Shift(right, 2);
-			keyInBits = UniteArrays(left, right);
-			keyInBits = Shaffle(keyInBits, P8);
-			roundKeys[1] = keyInBits;
+			Shaffle(ref keyInBits, P10);
+			SliceBitArray(keyInBits,5, out BitArray left, out BitArray right);
+			for (int i = 0; i < 2; i++) {
+				Shift(ref left, i + 1);
+				Shift(ref right, i+1);
+				BitArray roundKey = UniteArrays(left, right);
+				Shaffle(ref roundKey, P8);
+				roundKeys[i] = roundKey;
+			}
 		}
 		//фунция перестановки заданого значения и блока
+		private static void Shaffle(ref BitArray value, int[] pBlock) {
+			BitArray temp = new BitArray(pBlock.Length);
+			for (int i = 0; i < pBlock.Length; i++) {
+				temp[i] = value[pBlock[i] - 1];
+			}
+			value = temp;
+		}
 		private static BitArray Shaffle(BitArray value, int[] pBlock) {
 			BitArray temp = new BitArray(pBlock.Length);
 			for (int i = 0; i < pBlock.Length; i++) {
@@ -125,53 +124,47 @@ namespace DES {
 		//битовый сдвиг
 		//стандартный битовый сдвиг не работает с этим типом данных
 		//вопрос в том, что проще: своя функция или конвертирование в другой тип данных? :hmmm: 
-		private static BitArray Shift(BitArray array, int value) {
+		private static void Shift(ref BitArray array, int value) {
 			for (int i = 0; i < value; i++) {
 				bool temp = array[0];
-				for (int j = array.Length - 1; j > 0; j--) {
-					array[j] = array[j - 1];
+				for (int j = 1; j < array.Length; j++) {
+					array[j - 1] = array[j];
 				}
 				array[array.Length - 1] = temp;
 			}
-			return array;
 		}
 		//подстановка заданого значения по заданому с-блоку 
-		private static BitArray Substitute(BitArray bitArray, int[,] sBlock) {
+		private static void Substitute(ref BitArray bitArray, int[,] sBlock) {
 			BitArray first = new BitArray(2);
 			first.Set(0, bitArray[0]);
 			first.Set(1, bitArray[3]);
 			BitArray second = new BitArray(2);
 			second.Set(0, bitArray[1]);
-			second.Set(0, bitArray[2]);
+			second.Set(1, bitArray[2]);
 			int[] comparison = new int[2];
 			first.CopyTo(comparison, 0);
 			second.CopyTo(comparison, 1);
 			int[] temp = {sBlock[comparison[0], comparison[1]]};
-			BitArray output = new BitArray(temp);
-			output = CutBitArray(output, 2);
-			output = Reverse(output);
-			return output;
+			bitArray = new BitArray(temp);
+			bitArray = CutBitArray(bitArray, 2);
+			Reverse(ref bitArray);
 		}
 
 		public static char Encrypt(char input, int key) {
 			//инициализация всего что нужно вначале инициализировать
 			int value = GetCharPosition(input);
 			InitKeys(key);
-			var initInput = SliceBitArray(InitInput(value, IP), 4);
-			BitArray left = initInput.leftpart;
-			BitArray right = initInput.rightpart;
+			SliceBitArray(InitInput(value, IP), 4, out BitArray left, out BitArray right);
 			BitArray result = new BitArray(8);
 			//раунды
 			for (int i = 0; i < 2; i++) {
 				BitArray extRight = Shaffle(right, EP); //расширение текста
 				extRight = extRight.Xor(roundKeys[i]); //ксор с ключом
-				var temp = SliceBitArray(extRight, 4); 
-				BitArray toS0 = temp.leftpart;
-				BitArray toS1 = temp.rightpart;
-				toS0 = Substitute(toS0, S0);
-				toS1 = Substitute(toS1, S1);
+				SliceBitArray(extRight, 4, out BitArray toS0, out BitArray toS1); 
+				Substitute(ref toS0, S0);
+				Substitute(ref toS1, S1);
 				BitArray output = UniteArrays(toS0, toS1);
-				output = Shaffle(output, P4);
+				Shaffle(ref output, P4);
 				output = output.Xor(left);
 				if (i == 0) { //если первый раунд то меняем местами
 					left = right;
@@ -182,7 +175,6 @@ namespace DES {
 					result = Shaffle(result, BIP);
 				}
 			}
-			result = Reverse(result);
 			//страшная форма записи, которая по простому переводит битовый массив в число, а потом в символ
 			int[] final = new int[1];
 			result.CopyTo(final, 0);
@@ -193,21 +185,17 @@ namespace DES {
 		public static char Decrypt(char input, int key) { //тут все так же как в зашифровке
 			int value = GetCharPosition(input);
 			InitKeys(key);
-			var initInput = SliceBitArray(InitInput(value, IP), 4);
-			BitArray left = initInput.leftpart;
-			BitArray right = initInput.rightpart;
+			SliceBitArray(InitInput(value, BIP), 4, out BitArray left, out BitArray right);
 			BitArray result = new BitArray(8);
 
 			for (int i = 1; i >= 0; i--) {
 				BitArray extRight = Shaffle(right, EP);
 				extRight = extRight.Xor(roundKeys[i]);
-				var temp = SliceBitArray(extRight, 4);
-				BitArray toS0 = temp.leftpart;
-				BitArray toS1 = temp.rightpart;
-				toS0 = Substitute(toS0, S0);
-				toS1 = Substitute(toS1, S1);
+				SliceBitArray(extRight, 4, out BitArray toS0, out BitArray toS1);
+				Substitute(ref toS0, S0);
+				Substitute(ref toS1, S1);
 				BitArray output = UniteArrays(toS0, toS1);
-				output = Shaffle(output, P4);
+				Shaffle(ref output, P4);
 				output = output.Xor(left);
 				if (i == 1) {
 					left = right;
@@ -215,11 +203,11 @@ namespace DES {
 				}
 				else {
 					result = UniteArrays(output, right);
-					result = Shaffle(result, BIP);
+					Shaffle(ref result, IP);
+					Reverse(ref result);
 				}
 			}
 
-			result = Reverse(result);
 			//страшная форма записи, которая по простому переводит битовый массив в число, а потом в символ
 			int[] final = new int[1];
 			result.CopyTo(final, 0);

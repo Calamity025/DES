@@ -68,9 +68,9 @@ namespace DES {
         void DecryptClick(object sender, EventArgs e) {
             string temp = "";
             for (int i = 0; i < Output.TextLength; i++) {
-                temp += Convert.ToString(Calculus.Decrypt(Output.Text[i], (int) Key.Value));
+                temp += Convert.ToString(Calculus.Decrypt(Input.Text[i], (int) Key.Value));
             }
-            Input.Text = temp;
+            Output.Text = temp;
         }
     }
 }
